@@ -4,6 +4,7 @@ from pydantic import BaseModel
 import csv
 import os
 from pathlib import Path
+import pandas as pd
 
 app = FastAPI()
 
@@ -97,3 +98,21 @@ def append_email(email: EmailRecord):
 
     except (OSError, csv.Error) as error:
         raise HTTPException(status_code=500, detail=str(error))
+
+@app.get("/emails")
+def get_emails():
+    try:
+        if not OUTPUT_FILE.exists():
+            return []
+
+        df = pd.read_csv(OUTPUT_FILE, dtype=str).fillna("")
+        return df.to_dict(orient="records")
+
+    except pd.errors.EmptyDataError:
+        return []
+
+    except (OSError, pd.errors.ParserError) as error:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unable to read email data: {error}",
+        )
