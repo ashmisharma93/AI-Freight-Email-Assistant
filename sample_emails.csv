@@ -1,0 +1,11 @@
+email_id,subject,body
+E001,Request for freight quotation,"We need to ship 12 pallets of electronic goods from Delhi to Dubai. Cargo ready on 25 October. Please share the quotation process."
+E002,Shipment status enquiry,"Please provide an update on shipment SHP1045 travelling from Mumbai to Singapore."
+E003,Document request,"Please share the bill of lading for shipment SHP2081."
+E004,Request for freight quotation,"We need to transport machinery from Chennai to London. Please advise what shipment details you need."
+E005,Shipment status enquiry,"Our cargo has not arrived yet. Please check the current shipment status."
+E006,Document request,"Please confirm which documents are required for customs clearance."
+E007,General enquiry,"What are your office working hours?"
+E008,Request for freight quotation,"Please quote for 500 kg of textiles from Delhi to Dubai. We need delivery as soon as possible."
+E009,Shipment status enquiry,"Please confirm whether shipment SHP3002 has been dispatched."
+E010,Document request,"We have attached the commercial invoice for our shipment. Please advise the next steps."

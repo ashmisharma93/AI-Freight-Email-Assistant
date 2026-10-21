@@ -1,0 +1,36 @@
+
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Secrets and credentials
+.env
+.env.*
+!.env.example
+*credentials*.json
+*client_secret*.json
+token.json
+credentials.json
+
+# Local databases and logs
+*.db
+*.sqlite
+*.sqlite3
+*.log
+
+# Private or generated output data
+output/*.csv
+output/*.xlsx
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.vscode/
+
+output/
