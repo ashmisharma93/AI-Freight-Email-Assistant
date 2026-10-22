@@ -1,26 +1,54 @@
+import os
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-import csv
-import os
-from pathlib import Path
-import pandas as pd
+from sqlalchemy import Boolean, Integer, String, Text, create_engine
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
+
 
 app = FastAPI()
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
-OUTPUT_FILE = PROJECT_DIR / "output" / "gmail_test.csv"
 
-FIELDNAMES = [
-    "email_id",
-    "thread_id",
-    "sender",
-    "subject",
-    "body",
-    "category",
-    "needs_human_review",
-    "review_status",
-]
+DATABASE_URL = os.getenv('DATABASE_URL')
+
+if DATABASE_URL:
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+    engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+
+else:
+    local_db = PROJECT_DIR / "output"/ "freight_emails.db"
+    local_db.parent.mkdir(parents=True, exist_ok=True)
+    engine = create_engine(f"sqlite:///{local_db.as_posix()}", connect_args={"check_same_thread": False}, )
+
+
+SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+
+
+class Base(DeclarativeBase):
+    pass
+
+class EmailEntry(Base):
+    __tablename__ = "emails"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    email_id: Mapped[str] = mapped_column(
+        String(255), unique=True, nullable=False, index=True)
+    thread_id: Mapped[str] = mapped_column(String(255), default="")
+    sender: Mapped[str] = mapped_column(String(500), default="")
+    subject: Mapped[str] = mapped_column(String(1000), default="")
+    body: Mapped[str] = mapped_column(Text, default="")
+    category: Mapped[str] = mapped_column(String(100), default="other")
+    needs_human_review: Mapped[bool] = mapped_column(
+        Boolean, default=True
+    )
+    review_status: Mapped[str] = mapped_column(
+        String(100), default="Pending Review"
+    )
 
 
 class EmailRecord(BaseModel):
@@ -34,85 +62,83 @@ class EmailRecord(BaseModel):
     review_status: str = "Pending Review"
 
 
+@app.on_event("startup")
+def create_database_tables():
+    Base.metadata.create_all(bind=engine)
+
+
 @app.post("/append-email")
 def append_email(email: EmailRecord):
     record = email.model_dump()
+
     if not record["email_id"].strip():
         raise HTTPException(
             status_code=400,
-            detail = "email_id is required"
+            detail="email_id is required",
         )
-    
-    os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
 
     try:
-        file_exists = (
-            os.path.exists(OUTPUT_FILE)
-            and os.path.getsize(OUTPUT_FILE) > 0
-        )
+        with SessionLocal() as db:
+            existing = (
+                db.query(EmailEntry)
+                .filter(EmailEntry.email_id == record["email_id"])
+                .first()
+            )
 
-        # Avoid adding the same email twice.
-        if file_exists:
-            with open(
-                OUTPUT_FILE, "r", newline="", encoding="utf-8-sig"
-            ) as file:
-                reader = csv.DictReader(file)
-                existing_ids = {
-                    row.get("email_id", "") for row in reader
-                }
-
-            if record["email_id"] and record["email_id"] in existing_ids:
+            if existing:
                 return {
                     "success": True,
                     "duplicate": True,
                     "message": "Email already exists; no row added.",
                 }
 
-        # Add a newline if the existing file lacks one.
-        if file_exists:
-            with open(OUTPUT_FILE, "rb") as check:
-                check.seek(-1, os.SEEK_END)
-                last_byte = check.read(1)
+            new_email = EmailEntry(**record)
+            db.add(new_email)
+            db.commit()
 
-            if last_byte not in (b"\n", b"\r"):
-                with open(OUTPUT_FILE, "a", encoding="utf-8") as file:
-                    file.write("\n")
+            return {
+                "success": True,
+                "duplicate": False,
+                "email_id": record["email_id"],
+                "category": record["category"],
+            }
 
-        # Append a correctly quoted CSV record.
-        with open(
-            OUTPUT_FILE, "a", newline="", encoding="utf-8"
-        ) as file:
-            writer = csv.DictWriter(file, fieldnames=FIELDNAMES)
+    except SQLAlchemyError:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to save email to the database.",
+        )
 
-            if not file_exists:
-                writer.writeheader()
-
-            writer.writerow(record)
-
-        return {
-            "success": True,
-            "duplicate": False,
-            "email_id": record["email_id"],
-            "category": record["category"],
-        }
-
-    except (OSError, csv.Error) as error:
-        raise HTTPException(status_code=500, detail=str(error))
 
 @app.get("/emails")
 def get_emails():
     try:
-        if not OUTPUT_FILE.exists():
-            return []
+        with SessionLocal() as db:
+            emails = (
+                db.query(EmailEntry)
+                .order_by(EmailEntry.id)
+                .all()
+            )
 
-        df = pd.read_csv(OUTPUT_FILE, dtype=str).fillna("")
-        return df.to_dict(orient="records")
+            # Keep the response compatible with the existing dashboard.
+            return [
+                {
+                    "email_id": email.email_id,
+                    "thread_id": email.thread_id,
+                    "sender": email.sender,
+                    "subject": email.subject,
+                    "body": email.body,
+                    "category": email.category,
+                    "needs_human_review": str(
+                        email.needs_human_review
+                    ),
+                    "review_status": email.review_status,
+                }
+                for email in emails
+            ]
 
-    except pd.errors.EmptyDataError:
-        return []
-
-    except (OSError, pd.errors.ParserError) as error:
+    except SQLAlchemyError:
         raise HTTPException(
             status_code=500,
-            detail=f"Unable to read email data: {error}",
+            detail="Unable to read emails from the database.",
         )

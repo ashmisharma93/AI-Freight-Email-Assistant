@@ -5,3 +5,5 @@ pydantic
 uvicorn
 requests
 streamlit
+psycopg2-binary
+SQLAlchemy
