@@ -6,8 +6,7 @@ An end-to-end prototype that automates freight email processing using n8n, Pytho
 ## Project Links
 
 - **Live Dashboard:** [Open the Streamlit Dashboard](https://ai-freight-email-assistant-vpjyzfp7ddslduuwcoe6tv.streamlit.app/)
-- **API Documentation:** https://ai-freight-email-assistant.onrender.com/docs
-- **Backend API:** https://ai-freight-email-assistant.onrender.com
+- **API Documentation:** [View API Docs](https://ai-freight-email-assistant.onrender.com/docs)
 
 ## Project Overview
 
