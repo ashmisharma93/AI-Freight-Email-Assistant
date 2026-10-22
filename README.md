@@ -178,7 +178,7 @@ https://ai-freight-email-assistant.onrender.com/append-email
 
 Access the deployed Streamlit dashboard through the link in the Project Links section. The dashboard retrieves email records from the deployed FastAPI backend.
 
-## Review Statuses
+## Review Status
 
 - `Pending Review`
 - `Reviewed`
