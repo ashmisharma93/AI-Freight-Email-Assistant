@@ -147,3 +147,55 @@ def get_emails():
             status_code=500,
             detail="Unable to read emails from the database.",
         )
+
+class ReviewStatusUpdate(BaseModel):
+    review_status: str
+
+
+ALLOWED_REVIEW_STATUSES = {
+    "Pending Review",
+    "Reviewed",
+    "Needs Follow-up",
+}
+
+
+@app.patch("/emails/{email_id}/review-status")
+def update_review_status(
+    email_id: str,
+    update: ReviewStatusUpdate,
+):
+    if update.review_status not in ALLOWED_REVIEW_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid review status.",
+        )
+
+    try:
+        with SessionLocal() as db:
+            email = (
+                db.query(EmailEntry)
+                .filter(EmailEntry.email_id == email_id)
+                .first()
+            )
+
+            if email is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Email not found.",
+                )
+
+            email.review_status = update.review_status
+            db.commit()
+            db.refresh(email)
+
+            return {
+                "success": True,
+                "email_id": email.email_id,
+                "review_status": email.review_status,
+            }
+
+    except SQLAlchemyError:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to update review status.",
+        )
